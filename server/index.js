@@ -7,7 +7,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const db = new Database(path.join(__dirname, 'db.sqlite'));
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'db.sqlite');
+const db = new Database(DB_PATH);
 
 // ── Schema migration: drop & recreate if new columns missing ───────────────
 const cols = db.prepare("PRAGMA table_info(items)").all().map((c) => c.name);

@@ -31,7 +31,7 @@ function RowNumRenderer(params: RowNumParams) {
   }, rowNum);
 }
 
-function searchableEditor(searchField: string): Partial<ColDef> {
+function searchableEditor(searchField: string): Partial<ColDef<Item>> {
   return {
     cellEditor: SearchableCellEditor,
     cellEditorPopup: true,

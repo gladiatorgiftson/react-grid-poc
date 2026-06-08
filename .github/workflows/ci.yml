@@ -28,13 +28,6 @@ jobs:
       - name: Type check & build
         run: pnpm build
 
-      - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-          retention-days: 7
-
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -50,15 +43,18 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.HETZNER_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Sync server code to Hetzner
+      - name: Sync code to Hetzner
         run: |
           rsync -az --delete \
+            --exclude='.git' \
             --exclude='node_modules' \
-            --exclude='db.sqlite' \
+            --exclude='server/node_modules' \
+            --exclude='dist' \
+            --exclude='*.sqlite' \
             -e "ssh -i ~/.ssh/deploy_key" \
-            ./server/ ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }}:/opt/react-grid-poc/server/
+            ./ ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }}:/opt/react-grid-poc/
 
-      - name: Install deps & restart API
+      - name: Build & restart containers
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} \
-            "cd /opt/react-grid-poc/server && npm install --omit=dev && pm2 restart react-grid-api && pm2 save"
+            "cd /opt/react-grid-poc && docker compose up -d --build"

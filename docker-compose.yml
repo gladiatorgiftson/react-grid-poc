@@ -1,0 +1,30 @@
+services:
+  react-grid-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: react_grid_frontend
+    restart: unless-stopped
+    networks:
+      - eos_net
+
+  react-grid-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: react_grid_api
+    restart: unless-stopped
+    environment:
+      DB_PATH: /data/db.sqlite
+    volumes:
+      - react_grid_data:/data
+    networks:
+      - eos_net
+
+networks:
+  eos_net:
+    external: true
+    name: compose_eos_net
+
+volumes:
+  react_grid_data:
