@@ -27,6 +27,17 @@ function Field({ label, children, required }: FieldProps) {
 
 export function HeaderForm({ data, onChange }: HeaderFormProps) {
   const [expanded, setExpanded] = useState(true);
+  const [docs, setDocs] = useState<File[]>([]);
+
+  function handleDocChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files) return;
+    setDocs(prev => [...prev, ...Array.from(e.target.files!)]);
+    e.target.value = '';
+  }
+
+  function removeDoc(idx: number) {
+    setDocs(prev => prev.filter((_, i) => i !== idx));
+  }
 
   return (
     <section className="header-form">
@@ -119,7 +130,33 @@ export function HeaderForm({ data, onChange }: HeaderFormProps) {
               <input className="hf-input hf-input--wide" value={data.notes} placeholder="Enter notes…" onChange={(e) => onChange('notes', e.target.value)} />
             </Field>
 
-            <button className="hf-edit-btn" title="Edit header">✏</button>
+            <button className="hf-edit-btn" data-tooltip="Edit header">✏</button>
+          </div>
+
+          <div className="hf-row">
+            <div className="hf-field hf-field--wide">
+              <label className="hf-field__label">Vendor Documents</label>
+              <div className="hf-field__control">
+                <div className="hf-upload">
+                  <label className="hf-upload__trigger">
+                    <input
+                      type="file"
+                      multiple
+                      accept=".pdf,.xlsx,.xls,.csv,.docx,.doc,.png,.jpg"
+                      hidden
+                      onChange={handleDocChange}
+                    />
+                    + Attach Files
+                  </label>
+                  {docs.map((f, i) => (
+                    <span key={i} className="hf-upload__chip">
+                      <span className="hf-upload__chip-name">{f.name}</span>
+                      <button className="hf-upload__remove" onClick={() => removeDoc(i)}>✕</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

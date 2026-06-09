@@ -34,6 +34,7 @@ function TextEditor({ value, meta, onCommit, onCancel, onMoveDown, onMoveRight }
       value={draft}
       onChange={e => setDraft(e.target.value)}
       onBlur={() => onCommit(parse(draft, meta))}
+      onMouseDown={e => e.stopPropagation()}
       onKeyDown={e => {
         if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
         else if (e.key === 'Enter') { e.stopPropagation(); onCommit(parse(draft, meta)); onMoveDown(); }
@@ -51,7 +52,7 @@ function SearchEditor({ value, meta, options: optionsProp, onCommit, onCancel, o
   const [rect,       setRect]       = useState<DOMRect | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const options = optionsProp ?? apiOptions;
+  const options = optionsProp?.length ? optionsProp : apiOptions;
 
   useLayoutEffect(() => {
     if (inputRef.current) setRect(inputRef.current.getBoundingClientRect());
@@ -59,7 +60,7 @@ function SearchEditor({ value, meta, options: optionsProp, onCommit, onCancel, o
   }, []);
 
   useEffect(() => {
-    if (!optionsProp && meta.searchField) {
+    if (meta.searchField && !optionsProp?.length) {
       fetch(`/api/distinct?field=${meta.searchField}`)
         .then(r => r.json())
         .then(d => setApiOptions(d.values ?? []))
@@ -80,6 +81,7 @@ function SearchEditor({ value, meta, options: optionsProp, onCommit, onCancel, o
         className="dg-cell-input"
         value={query}
         onChange={e => { setQuery(e.target.value); setActiveIdx(-1); }}
+        onMouseDown={e => e.stopPropagation()}
         onKeyDown={e => {
           if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
           else if (e.key === 'Enter') {

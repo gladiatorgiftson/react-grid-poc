@@ -119,7 +119,7 @@ export function GridToolbar({
           <button
             className="grid-toolbar__freeze-chip"
             onClick={() => onSetFrozenCols(0)}
-            title="Click to unfreeze all columns"
+            data-tooltip="Unfreeze all columns"
           >
             🔒 {frozenCols} col{frozenCols !== 1 ? 's' : ''} frozen &nbsp;✕
           </button>
@@ -128,7 +128,7 @@ export function GridToolbar({
           variant={frozenRows > 0 ? 'outline' : 'ghost'}
           size="sm"
           onClick={() => onSetFrozenRows(frozenRows > 0 ? 0 : 1)}
-          title={frozenRows > 0 ? 'Click to unpin top row' : 'Keep first data row visible while scrolling down'}
+          data-tooltip={frozenRows > 0 ? 'Unpin top row' : 'Pin first row while scrolling'}
         >
           📌 {frozenRows > 0 ? 'Row Pinned' : 'Pin Top Row'}
         </Button>
@@ -156,7 +156,7 @@ export function GridToolbar({
                   onDrop={e => handleDrop(e, field)}
                   onDragEnd={handleDragEnd}
                 >
-                  <span className="col-panel__grip" title="Drag to reorder">
+                  <span className="col-panel__grip" data-tooltip="Drag to reorder">
                     <GripIcon />
                   </span>
                   <input

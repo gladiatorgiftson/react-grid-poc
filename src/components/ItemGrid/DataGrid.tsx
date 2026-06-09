@@ -305,7 +305,7 @@ export function DataGrid({
         }
         break;
       case 'c': case 'C':
-        if (e.ctrlKey || e.metaKey) { e.preventDefault(); copySelection(); }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey) { e.preventDefault(); copySelection(); }
         break;
       case 'v': case 'V':
         if (e.ctrlKey || e.metaKey) { e.preventDefault(); pasteSelection(); }
@@ -316,15 +316,21 @@ export function DataGrid({
   // ── Mouse ──────────────────────────────────────────────────────────────────
   const handleCellDown = useCallback((e: React.MouseEvent, r: number, c: number, colId: string) => {
     if (colId === '__num') return;
-    if (e.shiftKey && selAnchor) { setSelFocus({ row: r, col: c }); }
-    else {
+    if (e.shiftKey && selAnchor) {
+      setSelFocus({ row: r, col: c });
+    } else {
+      const alreadyFocused = !editCell && selFocus?.row === r && selFocus?.col === c;
       setSelAnchor({ row: r, col: c });
       setSelFocus({ row: r, col: c });
       if (editCell && (editCell.row !== r || editCell.col !== c)) setEditCell(null);
+      if (alreadyFocused) {
+        const colMeta = visibleCols[c]?.columnDef.meta as ColMeta | undefined;
+        if (colMeta?.editable) setEditCell({ row: r, col: c });
+      }
     }
     wrapRef.current?.focus();
     e.preventDefault();
-  }, [selAnchor, editCell]);
+  }, [selAnchor, selFocus, editCell, visibleCols]);
 
   const handleCellDblClick = useCallback((r: number, c: number) => {
     const meta = visibleCols[c]?.columnDef.meta as ColMeta | undefined;
@@ -429,17 +435,17 @@ export function DataGrid({
                           <button
                             className={`dg__filter-btn${isFiltered ? ' dg__filter-btn--active' : ''}`}
                             onClick={e => handleFilterBtnClick(e, header.column.id)}
-                            title={isFiltered ? 'Filter active — click to change' : 'Filter this column'}
+                            data-tooltip={isFiltered ? 'Filter active' : 'Filter'}
                           >
                             <FunnelIcon filled={isFiltered} />
                           </button>
                           <button
                             className={`dg__pin-btn${isFrozen ? ' dg__pin-btn--active' : ''}`}
                             onClick={e => handlePinClick(e, ci)}
-                            title={
-                              isFreezeEdge ? 'Unfreeze columns' :
-                              isFrozen     ? 'Click to reduce freeze to here' :
-                                             'Freeze up to this column'
+                            data-tooltip={
+                              isFreezeEdge ? 'Unfreeze' :
+                              isFrozen     ? 'Reduce freeze' :
+                                             'Freeze column'
                             }
                           >
                             <LockIcon locked={isFrozen} />
