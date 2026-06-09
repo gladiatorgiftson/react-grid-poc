@@ -1,29 +1,13 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { AgGridReact } from 'ag-grid-react';
-import { AllCommunityModule, ModuleRegistry, themeAlpine } from 'ag-grid-community';
-import type { CellValueChangedEvent, SelectionChangedEvent } from 'ag-grid-community';
+import { useCallback, useMemo, useState } from 'react';
 import type { Item } from '../../types';
-import { buildColumnDefs } from './columnDefs';
+import { DATA_COLUMNS } from './columns';
 import { GridToolbar } from './GridToolbar';
 import { GridFooter } from './GridFooter';
 import { SearchFilter } from './SearchFilter';
+import { DataGrid } from './DataGrid';
 
-ModuleRegistry.registerModules([AllCommunityModule]);
-
-const gridTheme = themeAlpine.withParams({
-  accentColor: '#1976D2',
-  headerBackgroundColor: '#F1F5F9',
-  headerTextColor: '#374151',
-  rowHeight: 44,
-  headerHeight: 44,
-  fontSize: 15,
-  fontFamily: 'Inter, system-ui, sans-serif',
-  borderColor: '#E2E8F0',
-  cellHorizontalPaddingScale: 0.9,
-});
-
-let _idCounter = 100;
-const genId = () => String(++_idCounter);
+let _id = 100;
+const genId = () => String(++_id);
 
 const BLANK_ROW: Omit<Item, 'id'> = {
   upcGtin: '', sku: '', internalPartNum: '',
@@ -36,81 +20,56 @@ const BLANK_ROW: Omit<Item, 'id'> = {
   warrantyMonths: 12, status: 'incomplete',
 };
 
-interface ItemGridProps {
+interface Props {
   rows: Item[];
   onRowsChange: (rows: Item[]) => void;
 }
 
-export function ItemGrid({ rows, onRowsChange }: ItemGridProps) {
-  const gridRef = useRef<AgGridReact<Item>>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
-  const [frozenCols, setFrozenCols] = useState(0);
-  const [frozenRows, setFrozenRows] = useState(0);
-  const [filterField, setFilterField] = useState('');
-  const [filterValue, setFilterValue] = useState('');
-
-  const columnDefs = useMemo(
-    () => buildColumnDefs(hiddenCols, frozenCols, frozenRows),
-    [hiddenCols, frozenCols, frozenRows],
+export function ItemGrid({ rows, onRowsChange }: Props) {
+  const [selectedIds,  setSelectedIds]  = useState<Set<string>>(new Set());
+  const [hiddenCols,   setHiddenCols]   = useState<Set<string>>(new Set());
+  const [frozenCols,   setFrozenCols]   = useState(0);
+  const [frozenRows,   setFrozenRows]   = useState(0);
+  const [filterField,  setFilterField]  = useState('');
+  const [filterValue,  setFilterValue]  = useState('');
+  const [columnOrder,  setColumnOrder]  = useState<string[]>(() =>
+    ['__num', ...DATA_COLUMNS.map(c => c.id as string)],
   );
 
   const filteredRows = useMemo(() => {
     if (!filterField || !filterValue) return rows;
-    return rows.filter((r) =>
+    return rows.filter(r =>
       String(r[filterField as keyof Item] ?? '')
         .toLowerCase()
         .includes(filterValue.toLowerCase()),
     );
   }, [rows, filterField, filterValue]);
 
-  const pinnedTopRowData = useMemo(
-    () => (frozenRows > 0 ? filteredRows.slice(0, frozenRows) : undefined),
-    [filteredRows, frozenRows],
-  );
-
-  const mainRowData = useMemo(
-    () => (frozenRows > 0 ? filteredRows.slice(frozenRows) : filteredRows),
-    [filteredRows, frozenRows],
-  );
-
-  const defaultColDef = useMemo(
-    () => ({ resizable: true, sortable: true, suppressHeaderMenuButton: false }),
-    [],
-  );
-
-  const handleCellValueChanged = useCallback((e: CellValueChangedEvent<Item>) => {
-    onRowsChange(rows.map((r) => (r.id === e.data.id ? { ...e.data } : r)));
-  }, [rows, onRowsChange]);
-
-  const handleSelectionChanged = useCallback((e: SelectionChangedEvent<Item>) => {
-    const ids = new Set(e.api.getSelectedRows().map((r) => r.id));
-    setSelectedIds(ids);
-  }, []);
-
   const addRow = useCallback(() => {
-    const blank: Item = { id: genId(), ...BLANK_ROW };
-    onRowsChange([...rows, blank]);
-    setTimeout(() => {
-      gridRef.current?.api?.ensureIndexVisible(rows.length, 'bottom');
-    }, 50);
+    onRowsChange([...rows, { id: genId(), ...BLANK_ROW }]);
   }, [rows, onRowsChange]);
 
   const duplicateSelected = useCallback(() => {
     const dupes = rows
-      .filter((r) => selectedIds.has(r.id))
-      .map((r) => ({ ...r, id: genId() }));
+      .filter(r => selectedIds.has(r.id))
+      .map(r => ({ ...r, id: genId() }));
     onRowsChange([...rows, ...dupes]);
   }, [rows, selectedIds, onRowsChange]);
 
   const deleteSelected = useCallback(() => {
-    onRowsChange(rows.filter((r) => !selectedIds.has(r.id)));
+    onRowsChange(rows.filter(r => !selectedIds.has(r.id)));
     setSelectedIds(new Set());
   }, [rows, selectedIds, onRowsChange]);
 
   const exportCsv = useCallback(() => {
-    gridRef.current?.api?.exportDataAsCsv({ fileName: 'items.csv' });
-  }, []);
+    const headers = Object.keys(rows[0] ?? {}).join(',');
+    const body = rows.map(r => Object.values(r).join(',')).join('\n');
+    const blob = new Blob([headers + '\n' + body], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'items.csv';
+    a.click();
+  }, [rows]);
 
   const importCsv = useCallback(() => {
     const input = document.createElement('input');
@@ -121,7 +80,7 @@ export function ItemGrid({ rows, onRowsChange }: ItemGridProps) {
   }, []);
 
   const toggleColumn = useCallback((field: string) => {
-    setHiddenCols((prev) => {
+    setHiddenCols(prev => {
       const next = new Set(prev);
       next.has(field) ? next.delete(field) : next.add(field);
       return next;
@@ -141,9 +100,22 @@ export function ItemGrid({ rows, onRowsChange }: ItemGridProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newRow),
     }).catch(() => {});
-    setTimeout(() => {
-      gridRef.current?.api?.ensureIndexVisible(rows.length, 'bottom');
-    }, 50);
+  }, [rows, onRowsChange]);
+
+  const handleCellChange = useCallback((rowId: string, field: string, value: unknown) => {
+    onRowsChange(rows.map(r => r.id === rowId ? { ...r, [field]: value } : r));
+  }, [rows, onRowsChange]);
+
+  const handleBatchChange = useCallback((changes: Array<{ rowId: string; field: string; value: unknown }>) => {
+    const map = new Map<string, Record<string, unknown>>();
+    changes.forEach(({ rowId, field, value }) => {
+      if (!map.has(rowId)) map.set(rowId, {});
+      map.get(rowId)![field] = value;
+    });
+    onRowsChange(rows.map(r => {
+      const patch = map.get(r.id);
+      return patch ? { ...r, ...patch } : r;
+    }));
   }, [rows, onRowsChange]);
 
   return (
@@ -153,6 +125,7 @@ export function ItemGrid({ rows, onRowsChange }: ItemGridProps) {
         hiddenCols={hiddenCols}
         frozenCols={frozenCols}
         frozenRows={frozenRows}
+        columnOrder={columnOrder}
         onAddRow={addRow}
         onDuplicate={duplicateSelected}
         onDeleteSelected={deleteSelected}
@@ -161,28 +134,24 @@ export function ItemGrid({ rows, onRowsChange }: ItemGridProps) {
         onToggleColumn={toggleColumn}
         onSetFrozenCols={setFrozenCols}
         onSetFrozenRows={setFrozenRows}
+        onColumnOrderChange={setColumnOrder}
       />
 
       <SearchFilter onFilter={handleFilter} onAddRecord={handleAddRecord} />
 
-      <div className="item-grid-wrap">
-        <AgGridReact<Item>
-          ref={gridRef}
-          theme={gridTheme}
-          columnDefs={columnDefs}
-          rowData={mainRowData}
-          pinnedTopRowData={pinnedTopRowData}
-          defaultColDef={defaultColDef}
-          rowSelection={{ mode: 'multiRow', checkboxes: true, headerCheckbox: true, enableClickSelection: false }}
-          cellSelection={true}
-          onCellValueChanged={handleCellValueChanged}
-          onSelectionChanged={handleSelectionChanged}
-          domLayout="autoHeight"
-          animateRows={false}
-          stopEditingWhenCellsLoseFocus
-          getRowId={(p) => p.data.id}
-        />
-      </div>
+      <DataGrid
+        rows={filteredRows}
+        frozenRows={frozenRows}
+        hiddenCols={hiddenCols}
+        frozenCols={frozenCols}
+        columnOrder={columnOrder}
+        onSetFrozenCols={setFrozenCols}
+        onColumnOrderChange={setColumnOrder}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        onCellChange={handleCellChange}
+        onBatchChange={handleBatchChange}
+      />
 
       <GridFooter rows={filteredRows} />
     </section>

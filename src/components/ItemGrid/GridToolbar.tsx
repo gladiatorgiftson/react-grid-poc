@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '../ui/Button';
-import { ALL_TOGGLE_COLS } from './columnDefs';
+import { ALL_TOGGLE_COLS } from './columns';
 
 interface GridToolbarProps {
   selectedCount: number;
   hiddenCols: Set<string>;
   frozenCols: number;
   frozenRows: number;
+  columnOrder: string[];
   onAddRow: () => void;
   onDuplicate: () => void;
   onDeleteSelected: () => void;
@@ -15,6 +16,17 @@ interface GridToolbarProps {
   onToggleColumn: (field: string) => void;
   onSetFrozenCols: (n: number) => void;
   onSetFrozenRows: (n: number) => void;
+  onColumnOrderChange: (newOrder: string[]) => void;
+}
+
+function GripIcon() {
+  return (
+    <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
+      <circle cx="3" cy="2.5" r="1.2" /><circle cx="7" cy="2.5" r="1.2" />
+      <circle cx="3" cy="7"   r="1.2" /><circle cx="7" cy="7"   r="1.2" />
+      <circle cx="3" cy="11.5" r="1.2" /><circle cx="7" cy="11.5" r="1.2" />
+    </svg>
+  );
 }
 
 export function GridToolbar({
@@ -22,6 +34,7 @@ export function GridToolbar({
   hiddenCols,
   frozenCols,
   frozenRows,
+  columnOrder,
   onAddRow,
   onDuplicate,
   onDeleteSelected,
@@ -30,18 +43,65 @@ export function GridToolbar({
   onToggleColumn,
   onSetFrozenCols,
   onSetFrozenRows,
+  onColumnOrderChange,
 }: GridToolbarProps) {
   const [colPanelOpen, setColPanelOpen] = useState(false);
-  const [freezePanelOpen, setFreezePanelOpen] = useState(false);
+  const [dragId,       setDragId]       = useState<string | null>(null);
+  const [overId,       setOverId]       = useState<string | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setColPanelOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  const labelMap = Object.fromEntries(ALL_TOGGLE_COLS.map(c => [c.field, c.label]));
+
+  const orderedCols = columnOrder
+    .filter(id => id !== '__num' && labelMap[id])
+    .map(id => ({ field: id, label: labelMap[id] }));
+
+  function handleDragStart(e: React.DragEvent, colId: string) {
+    setDragId(colId);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleDragOver(e: React.DragEvent, colId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (colId !== overId) setOverId(colId);
+  }
+
+  function handleDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    if (!dragId || dragId === targetId) { setDragId(null); setOverId(null); return; }
+    const order = ['__num', ...orderedCols.map(c => c.field)];
+    const fromIdx = order.indexOf(dragId);
+    const toIdx   = order.indexOf(targetId);
+    const next = [...order];
+    next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, dragId);
+    onColumnOrderChange(next);
+    setDragId(null);
+    setOverId(null);
+  }
+
+  function handleDragEnd() {
+    setDragId(null);
+    setOverId(null);
+  }
 
   return (
-    <div className="grid-toolbar">
+    <div className="grid-toolbar" ref={toolbarRef}>
       <div className="grid-toolbar__section-label">Item Details</div>
 
       <div className="grid-toolbar__left">
-        <Button variant="primary" size="sm" onClick={onAddRow}>
-          + Add Row
-        </Button>
+        <Button variant="primary" size="sm" onClick={onAddRow}>+ Add Row</Button>
         <div className="grid-toolbar__sep" />
         <Button variant="ghost" size="sm" disabled={selectedCount === 0} onClick={onDuplicate}>
           ⧉ Duplicate Row
@@ -50,91 +110,59 @@ export function GridToolbar({
           🗑 Delete Row
         </Button>
         <div className="grid-toolbar__sep" />
-        <Button variant="ghost" size="sm" onClick={onImport}>
-          ↑ Import
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onExport}>
-          ↓ Export
-        </Button>
+        <Button variant="ghost" size="sm" onClick={onImport}>↑ Import</Button>
+        <Button variant="ghost" size="sm" onClick={onExport}>↓ Export</Button>
       </div>
 
       <div className="grid-toolbar__right">
-        {/* Show / Hide Columns */}
-        <div className="grid-toolbar__dropdown-wrap">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => { setColPanelOpen((v) => !v); setFreezePanelOpen(false); }}
+        {frozenCols > 0 && (
+          <button
+            className="grid-toolbar__freeze-chip"
+            onClick={() => onSetFrozenCols(0)}
+            title="Click to unfreeze all columns"
           >
-            ⊞ Show / Hide Columns
+            🔒 {frozenCols} col{frozenCols !== 1 ? 's' : ''} frozen &nbsp;✕
+          </button>
+        )}
+        <Button
+          variant={frozenRows > 0 ? 'outline' : 'ghost'}
+          size="sm"
+          onClick={() => onSetFrozenRows(frozenRows > 0 ? 0 : 1)}
+          title={frozenRows > 0 ? 'Click to unpin top row' : 'Keep first data row visible while scrolling down'}
+        >
+          📌 {frozenRows > 0 ? 'Row Pinned' : 'Pin Top Row'}
+        </Button>
+
+        <div className="grid-toolbar__sep" />
+
+        <div className="grid-toolbar__dropdown-wrap">
+          <Button variant="ghost" size="sm" onClick={() => setColPanelOpen(v => !v)}>
+            ⊞ Columns
           </Button>
           {colPanelOpen && (
             <div className="col-panel">
-              <div className="col-panel__title">Columns</div>
-              {ALL_TOGGLE_COLS.map(({ field, label }) => (
-                <label key={field} className="col-panel__item">
+              <div className="col-panel__title">Show / Hide · Drag to Reorder</div>
+              {orderedCols.map(({ field, label }) => (
+                <label
+                  key={field}
+                  className={[
+                    'col-panel__item',
+                    dragId === field ? 'col-panel__item--dragging' : '',
+                    overId === field && dragId !== field ? 'col-panel__item--drag-over' : '',
+                  ].filter(Boolean).join(' ')}
+                  draggable
+                  onDragStart={e => handleDragStart(e, field)}
+                  onDragOver={e => handleDragOver(e, field)}
+                  onDrop={e => handleDrop(e, field)}
+                  onDragEnd={handleDragEnd}
+                >
+                  <span className="col-panel__grip" title="Drag to reorder">
+                    <GripIcon />
+                  </span>
                   <input
                     type="checkbox"
                     checked={!hiddenCols.has(field)}
                     onChange={() => onToggleColumn(field)}
-                  />
-                  {label}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Freeze Panes */}
-        <div className="grid-toolbar__dropdown-wrap">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => { setFreezePanelOpen((v) => !v); setColPanelOpen(false); }}
-          >
-            ☰ Freeze Panes
-          </Button>
-          {freezePanelOpen && (
-            <div className="col-panel col-panel--freeze">
-              <div className="col-panel__title">Freeze Panes</div>
-
-              <label className="col-panel__item">
-                <input
-                  type="radio"
-                  name="freeze-col"
-                  checked={frozenCols === 0 && frozenRows === 0}
-                  onChange={() => { onSetFrozenCols(0); onSetFrozenRows(0); setFreezePanelOpen(false); }}
-                />
-                Unfreeze All
-              </label>
-
-              <div className="col-panel__group-label">Freeze Row</div>
-              <label className="col-panel__item">
-                <input
-                  type="checkbox"
-                  checked={frozenRows > 0}
-                  onChange={() => onSetFrozenRows(frozenRows > 0 ? 0 : 1)}
-                />
-                Freeze top row
-              </label>
-
-              <div className="col-panel__group-label">Freeze Column</div>
-              <label className="col-panel__item">
-                <input
-                  type="radio"
-                  name="freeze-col"
-                  checked={frozenCols === 0}
-                  onChange={() => { onSetFrozenCols(0); setFreezePanelOpen(false); }}
-                />
-                None
-              </label>
-              {ALL_TOGGLE_COLS.map(({ field, label }, idx) => (
-                <label key={field} className="col-panel__item">
-                  <input
-                    type="radio"
-                    name="freeze-col"
-                    checked={frozenCols === idx + 1}
-                    onChange={() => { onSetFrozenCols(idx + 1); setFreezePanelOpen(false); }}
                   />
                   {label}
                 </label>
