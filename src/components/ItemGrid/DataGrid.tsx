@@ -270,7 +270,7 @@ export function DataGrid({
       col: Math.max(1, Math.min(visibleCols.length - 1, base.col + dc)),
     };
     if (extend) { setSelFocus(next); }
-    else { setSelAnchor(next); setSelFocus(next); setEditCell(null); }
+    else { setSelAnchor(next); setSelFocus(next); setEditCell(null); wrapRef.current?.focus(); }
     requestAnimationFrame(() => {
       wrapRef.current
         ?.querySelector<HTMLElement>(`[data-cell="${next.row}-${next.col}"]`)
@@ -529,8 +529,8 @@ export function DataGrid({
                           value={rawVal}
                           meta={meta ?? { editable: true, editorType: 'text' }}
                           options={colUniqueValues.get(vc.id)}
-                          onCommit={v => { onCellChange(row.id, vc.id, v); setEditCell(null); }}
-                          onCancel={() => setEditCell(null)}
+                          onCommit={v => { onCellChange(row.id, vc.id, v); setEditCell(null); wrapRef.current?.focus(); }}
+                          onCancel={() => { setEditCell(null); wrapRef.current?.focus(); }}
                           onMoveDown={() => moveFocus(1, 0, false)}
                           onMoveRight={() => moveFocus(0, 1, false)}
                         />
